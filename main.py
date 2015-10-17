@@ -4,7 +4,7 @@ import logging
 import os.path
 import webapp2
 
-from webapp2_extras import auth, sessions
+from webapp2_extras import auth, security, sessions
 from google.appengine.ext.webapp import template
 
 
@@ -227,7 +227,7 @@ class SetPasswordHandler(BaseHandler):
             return self.display_message('passwords do not match')
 
         user = self.user
-        user.set_password(password)
+        user.password = security.generate_password_hash(password, length=12)
         user.put()
 
         # remove signup token, we don't want users to come back with an old link
