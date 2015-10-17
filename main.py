@@ -238,7 +238,7 @@ class LoginHandler(BaseHandler):
             self.auth.get_user_by_password(username, password, remember=True,
                                            save_session=True)
             return self.redirect(self.uri_for('home'))
-        except (auth.InvalidAuthIdError, auth.InvalidPasswordError) as e:
+        except auth.AuthError as e:
             logging.info('Login failed for user %s because of %s', username, type(e))
             return self._serve_page(True)
 
