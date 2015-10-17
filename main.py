@@ -25,7 +25,7 @@ def user_required(handler):
       Will also fail if there's no session present.
     """
     def check_login(self, *args, **kwargs):
-        if not self.auth.get_user_by_session():
+        if not self.user_info:
             return self.redirect(self.uri_for('login'), abort=True)
         return handler(self, *args, **kwargs)
     return check_login
