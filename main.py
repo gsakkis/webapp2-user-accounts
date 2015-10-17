@@ -71,11 +71,6 @@ class BaseHandler(webapp2.RequestHandler):
         """
         return self.auth.store.user_model
 
-    @webapp2.cached_property
-    def session(self):
-        """Shortcut to access the current session."""
-        return self.session_store.get_session(backend="datastore")
-
     def render_template(self, view_filename, params=None):
         if not params:
             params = {}
@@ -155,7 +150,6 @@ class ForgotPasswordHandler(BaseHandler):
 
         user_id = user.get_id()
         token = self.user_model.create_auth_token(user_id, 'signup')
-
         verification_url = self.uri_for('verification', type='p', user_id=user_id,
                                         signup_token=token, _full=True)
 
