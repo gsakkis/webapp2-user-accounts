@@ -7,10 +7,11 @@ import webapp2
 from webapp2_extras import auth, security, sessions
 from google.appengine.ext.webapp import template
 
+from models import User
 
 config = {
     'webapp2_extras.auth': {
-        'user_model': 'models.User',
+        'user_model': User,
         'user_attributes': ['name']
     },
     'webapp2_extras.sessions': {
@@ -49,14 +50,6 @@ class BaseHandler(webapp2.RequestHandler):
           A dictionary with most user information
         """
         return self.auth.get_user_by_session()
-
-    @webapp2.cached_property
-    def user_model(self):
-        """Returns the implementation of the user model.
-
-        It is consistent with config['webapp2_extras.auth']['user_model'], if set.
-        """
-        return self.auth.store.user_model
 
     def render_template(self, view_filename, params=None):
         if not params:
@@ -101,18 +94,16 @@ class SignupHandler(BaseHandler):
         last_name = self.request.get('lastname')
 
         unique_properties = ['email_address']
-        user_data = self.user_model.create_user(user_name,
-                                                unique_properties,
-                                                email_address=email, name=name,
-                                                password_raw=password,
-                                                last_name=last_name, verified=False)
+        user_data = User.create_user(user_name, unique_properties,
+                                     email_address=email, password_raw=password,
+                                     name=name, last_name=last_name, verified=False)
         if not user_data[0]:  # user_data is a tuple
             return self.display_message(
                 'Unable to create user for email %s because of duplicate keys %s'
                 % (user_name, user_data[1]))
 
         user_id = user_data[1].get_id()
-        token = self.user_model.create_auth_token(user_id, 'signup')
+        token = User.create_auth_token(user_id, 'signup')
         verification_url = self.uri_for('verification', type='v', user_id=user_id,
                                         signup_token=token, _full=True)
 
@@ -130,13 +121,13 @@ class ForgotPasswordHandler(BaseHandler):
     def post(self):
         username = self.request.get('username')
 
-        user = self.user_model.get_by_auth_id(username)
+        user = User.get_by_auth_id(username)
         if not user:
             logging.info('Could not find any user entry for username %s', username)
             return self._serve_page(not_found=True)
 
         user_id = user.get_id()
-        token = self.user_model.create_auth_token(user_id, 'signup')
+        token = User.create_auth_token(user_id, 'signup')
         verification_url = self.uri_for('verification', type='p', user_id=user_id,
                                         signup_token=token, _full=True)
 
@@ -165,9 +156,7 @@ class VerificationHandler(BaseHandler):
         # self.auth.get_user_by_token(user_id, signup_token)
         # unfortunately the auth interface does not (yet) allow to manipulate
         # signup tokens concisely
-        user, ts = self.user_model.get_by_auth_token(int(user_id), signup_token,
-                                                     'signup')
-
+        user, ts = User.get_by_auth_token(int(user_id), signup_token, 'signup')
         if not user:
             logging.info('Could not find any user with id "%s" signup token "%s"',
                          user_id, signup_token)
@@ -178,8 +167,7 @@ class VerificationHandler(BaseHandler):
 
         if verification_type == 'v':
             # remove signup token, we don't want users to come back with an old link
-            self.user_model.delete_auth_token(user.get_id(), signup_token, 'signup')
-
+            User.delete_auth_token(user.get_id(), signup_token, 'signup')
             if not user.verified:
                 user.verified = True
                 user.put()
@@ -207,12 +195,12 @@ class SetPasswordHandler(BaseHandler):
         if not password or password != self.request.get('confirm_password'):
             return self.display_message('passwords do not match')
 
-        user = self.user_model.get_by_id(self.user_info['user_id'])
+        user = User.get_by_id(self.user_info['user_id'])
         user.password = security.generate_password_hash(password, length=12)
         user.put()
 
         # remove signup token, we don't want users to come back with an old link
-        self.user_model.delete_auth_token(user.get_id(), old_token, 'signup')
+        User.delete_auth_token(user.get_id(), old_token, 'signup')
 
         return self.display_message('Password updated')
 
