@@ -51,19 +51,6 @@ class BaseHandler(webapp2.RequestHandler):
         return self.auth.get_user_by_session()
 
     @webapp2.cached_property
-    def user(self):
-        """Shortcut to access the current logged in user.
-
-        Unlike user_info, it fetches information from the persistence layer and
-        returns an instance of the underlying model.
-
-        :returns
-          The instance of the user model associated to the logged in user.
-        """
-        u = self.user_info
-        return self.user_model.get_by_id(u['user_id']) if u else None
-
-    @webapp2.cached_property
     def user_model(self):
         """Returns the implementation of the user model.
 
@@ -220,7 +207,7 @@ class SetPasswordHandler(BaseHandler):
         if not password or password != self.request.get('confirm_password'):
             return self.display_message('passwords do not match')
 
-        user = self.user
+        user = self.user_model.get_by_id(self.user_info['user_id'])
         user.password = security.generate_password_hash(password, length=12)
         user.put()
 
