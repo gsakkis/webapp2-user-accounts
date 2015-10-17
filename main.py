@@ -130,7 +130,7 @@ class SignupHandler(BaseHandler):
                 % (user_name, user_data[1]))
 
         user_id = user_data[1].get_id()
-        token = self.user_model.create_signup_token(user_id)
+        token = self.user_model.create_auth_token(user_id, 'signup')
         verification_url = self.uri_for('verification', type='v', user_id=user_id,
                                         signup_token=token, _full=True)
 
@@ -154,7 +154,7 @@ class ForgotPasswordHandler(BaseHandler):
             return self._serve_page(not_found=True)
 
         user_id = user.get_id()
-        token = self.user_model.create_signup_token(user_id)
+        token = self.user_model.create_auth_token(user_id, 'signup')
 
         verification_url = self.uri_for('verification', type='p', user_id=user_id,
                                         signup_token=token, _full=True)
@@ -197,7 +197,7 @@ class VerificationHandler(BaseHandler):
 
         if verification_type == 'v':
             # remove signup token, we don't want users to come back with an old link
-            self.user_model.delete_signup_token(user.get_id(), signup_token)
+            self.user_model.delete_auth_token(user.get_id(), signup_token, 'signup')
 
             if not user.verified:
                 user.verified = True
@@ -231,7 +231,7 @@ class SetPasswordHandler(BaseHandler):
         user.put()
 
         # remove signup token, we don't want users to come back with an old link
-        self.user_model.delete_signup_token(user.get_id(), old_token)
+        self.user_model.delete_auth_token(user.get_id(), old_token, 'signup')
 
         return self.display_message('Password updated')
 
