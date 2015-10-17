@@ -8,6 +8,17 @@ from webapp2_extras import auth, sessions
 from google.appengine.ext.webapp import template
 
 
+config = {
+    'webapp2_extras.auth': {
+        'user_model': 'models.User',
+        'user_attributes': ['name']
+    },
+    'webapp2_extras.sessions': {
+        'secret_key': 'YOUR_SECRET_KEY'
+    }
+}
+
+
 def user_required(handler):
     """
       Decorator that checks if there's a user associated with the current session.
@@ -264,15 +275,6 @@ class AuthenticatedHandler(BaseHandler):
     def get(self):
         return self.render_template('authenticated.html')
 
-config = {
-    'webapp2_extras.auth': {
-        'user_model': 'models.User',
-        'user_attributes': ['name']
-    },
-    'webapp2_extras.sessions': {
-        'secret_key': 'YOUR_SECRET_KEY'
-    }
-}
 
 app = webapp2.WSGIApplication([
     webapp2.Route('/', MainHandler, name='home'),
