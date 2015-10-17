@@ -35,11 +35,6 @@ def user_required(handler):
 class BaseHandler(webapp2.RequestHandler):
 
     @webapp2.cached_property
-    def auth(self):
-        """Shortcut to access the auth instance as a property."""
-        return auth.get_auth()
-
-    @webapp2.cached_property
     def user_info(self):
         """Shortcut to access a subset of the user attributes that are stored
         in the session.
@@ -49,7 +44,7 @@ class BaseHandler(webapp2.RequestHandler):
         :returns
           A dictionary with most user information
         """
-        return self.auth.get_user_by_session()
+        return auth.get_auth().get_user_by_session()
 
     def render_template(self, view_filename, params=None):
         if not params:
@@ -153,7 +148,7 @@ class VerificationHandler(BaseHandler):
         verification_type = kwargs['type']
 
         # it should be something more concise like
-        # self.auth.get_user_by_token(user_id, signup_token)
+        # auth.get_auth().get_user_by_token(user_id, signup_token)
         # unfortunately the auth interface does not (yet) allow to manipulate
         # signup tokens concisely
         user, ts = User.get_by_auth_token(int(user_id), signup_token, 'signup')
@@ -163,7 +158,8 @@ class VerificationHandler(BaseHandler):
             self.abort(404)
 
         # store user data in the session
-        self.auth.set_session(self.auth.store.user_to_dict(user), remember=True)
+        auth_obj = auth.get_auth()
+        auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
         if verification_type == 'v':
             # remove signup token, we don't want users to come back with an old link
@@ -214,8 +210,8 @@ class LoginHandler(BaseHandler):
         username = self.request.get('username')
         password = self.request.get('password')
         try:
-            self.auth.get_user_by_password(username, password, remember=True,
-                                           save_session=True)
+            auth.get_auth().get_user_by_password(username, password,
+                                                 remember=True, save_session=True)
             return self.redirect(self.uri_for('home'))
         except auth.AuthError as e:
             logging.info('Login failed for user %s because of %s', username, type(e))
@@ -233,7 +229,7 @@ class LoginHandler(BaseHandler):
 class LogoutHandler(BaseHandler):
 
     def get(self):
-        self.auth.unset_session()
+        auth.get_auth().unset_session()
         return self.redirect(self.uri_for('home'))
 
 
