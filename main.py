@@ -47,6 +47,11 @@ class BaseHandler(webapp2.RequestHandler):
         """
         return auth.get_auth().get_user_by_session()
 
+    def create_verification_url(self, user):
+        user_id = user.get_id()
+        token = User.create_auth_token(user_id, VerificationHandler.TOKEN_SUBJECT)
+        return self.uri_for('verification', user_id=user_id, token=token, _full=True)
+
     def render_template(self, view_filename, params=None):
         if not params:
             params = {}
@@ -92,13 +97,7 @@ class SignupHandler(BaseHandler):
                 'Unable to create user for email %s because of duplicate keys %s'
                 % (email, user_data[1]))
 
-        user_id = user_data[1].get_id()
-        verification_type = 'signup'
-        token = User.create_auth_token(user_id, verification_type)
-        verification_url = self.uri_for('verification',
-                                        verification_type=verification_type,
-                                        user_id=user_id, token=token, _full=True)
-
+        verification_url = self.create_verification_url(user_data[1])
         msg = 'Send an email to user in order to verify their address. \
           They will be able to do so by visiting <a href="{url}">{url}</a>'
 
@@ -117,13 +116,7 @@ class LoginHandler(BaseHandler):
             logging.info('Could not find any user entry for email %s', email)
             return self._serve_page(email, not_found=True)
 
-        user_id = user.get_id()
-        verification_type = 'reset'
-        token = User.create_auth_token(user_id, verification_type)
-        verification_url = self.uri_for('verification',
-                                        verification_type=verification_type,
-                                        user_id=user_id, token=token, _full=True)
-
+        verification_url = self.create_verification_url(user)
         msg = 'Send an email to user to allow them to login. \
           They will be able to do so by visiting <a href="{url}">{url}</a>'
 
@@ -136,15 +129,17 @@ class LoginHandler(BaseHandler):
 
 class VerificationHandler(BaseHandler):
 
-    def get(self, verification_type, user_id, token):
-        user, ts = User.get_by_auth_token(int(user_id), token, verification_type)
+    TOKEN_SUBJECT = 'temp'
+
+    def get(self, user_id, token):
+        user, ts = User.get_by_auth_token(int(user_id), token, self.TOKEN_SUBJECT)
         if not user:
             logging.info('Could not find any user with id "%s" token "%s"',
                          user_id, token)
             self.abort(404, 'This link has expired')
 
         # remove token, we don't want users to come back with an old link
-        User.delete_auth_token(user.get_id(), token, verification_type)
+        User.delete_auth_token(user.get_id(), token, self.TOKEN_SUBJECT)
 
         # store user data in the session
         auth_obj = auth.get_auth()
@@ -152,15 +147,12 @@ class VerificationHandler(BaseHandler):
         auth_obj.unset_session()
         auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
-        if verification_type == 'signup':
-            if not user.verified:
-                user.verified = True
-                user.put()
+        if not user.verified:
+            user.verified = True
+            user.put()
             return self.display_message('User email address has been verified.')
-        elif verification_type == 'reset':
+        else:
             return self.redirect(self.uri_for('home'))
-
-        assert False, verification_type
 
 
 class LogoutHandler(BaseHandler):
@@ -180,7 +172,7 @@ class AuthenticatedHandler(BaseHandler):
 app = webapp2.WSGIApplication([
     webapp2.Route('/', MainHandler, name='home'),
     webapp2.Route('/signup', SignupHandler),
-    webapp2.Route(r'/<verification_type:signup|reset>/<user_id:\d+>/<token:.+>',
+    webapp2.Route(r'/verify/<user_id:\d+>/<token:.+>',
                   VerificationHandler, name='verification'),
     webapp2.Route('/login', LoginHandler, name='login'),
     webapp2.Route('/logout', LogoutHandler),
