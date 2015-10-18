@@ -151,6 +151,8 @@ class VerificationHandler(BaseHandler):
 
         # store user data in the session
         auth_obj = auth.get_auth()
+        # invalidate current session (if any) and set a new one
+        auth_obj.unset_session()
         auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
         if verification_type == 'signup':
