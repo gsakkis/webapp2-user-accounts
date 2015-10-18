@@ -95,8 +95,10 @@ class SignupHandler(BaseHandler):
                 % (username, user_data[1]))
 
         user_id = user_data[1].get_id()
-        token = User.create_auth_token(user_id, 'signup')
-        verification_url = self.uri_for('verification', verification_type='v',
+        verification_type = 'signup'
+        token = User.create_auth_token(user_id, verification_type)
+        verification_url = self.uri_for('verification',
+                                        verification_type=verification_type,
                                         user_id=user_id, token=token, _full=True)
 
         msg = 'Send an email to user in order to verify their address. \
@@ -118,8 +120,10 @@ class ForgotPasswordHandler(BaseHandler):
             return self._serve_page(not_found=True)
 
         user_id = user.get_id()
-        token = User.create_auth_token(user_id, 'signup')
-        verification_url = self.uri_for('verification', verification_type='p',
+        verification_type = 'reset'
+        token = User.create_auth_token(user_id, verification_type)
+        verification_url = self.uri_for('verification',
+                                        verification_type=verification_type,
                                         user_id=user_id, token=token, _full=True)
 
         msg = 'Send an email to user in order to reset their password. \
@@ -139,7 +143,7 @@ class ForgotPasswordHandler(BaseHandler):
 class VerificationHandler(BaseHandler):
 
     def get(self, verification_type, user_id, token):
-        user, ts = User.get_by_auth_token(int(user_id), token, 'signup')
+        user, ts = User.get_by_auth_token(int(user_id), token, verification_type)
         if not user:
             logging.info('Could not find any user with id "%s" token "%s"',
                          user_id, token)
@@ -149,27 +153,23 @@ class VerificationHandler(BaseHandler):
         auth_obj = auth.get_auth()
         auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
-        if verification_type == 'v':
+        if verification_type == 'signup':
             # remove token, we don't want users to come back with an old link
-            User.delete_auth_token(user.get_id(), token, 'signup')
+            User.delete_auth_token(user.get_id(), token, verification_type)
             if not user.verified:
                 user.verified = True
                 user.put()
 
             return self.display_message('User email address has been verified.')
-        elif verification_type == 'p':
-            # supply user to the page
-            params = {
-                'user': user,
-                'token': token
-            }
-            return self.render_template('resetpassword.html', params)
+        elif verification_type == 'reset':
+            return self.render_template('resetpassword.html',
+                                        {'user': user, 'token': token})
         else:
             logging.info('verification type not supported')
             self.abort(404)
 
 
-class SetPasswordHandler(BaseHandler):
+class ResetPasswordHandler(BaseHandler):
 
     @user_required
     def post(self):
@@ -184,7 +184,7 @@ class SetPasswordHandler(BaseHandler):
         user.put()
 
         # remove token, we don't want users to come back with an old link
-        User.delete_auth_token(user.get_id(), old_token, 'signup')
+        User.delete_auth_token(user.get_id(), old_token, 'reset')
 
         return self.display_message('Password updated')
 
@@ -231,9 +231,9 @@ class AuthenticatedHandler(BaseHandler):
 app = webapp2.WSGIApplication([
     webapp2.Route('/', MainHandler, name='home'),
     webapp2.Route('/signup', SignupHandler),
-    webapp2.Route(r'/<verification_type:v|p>/<user_id:\d+>/<token:.+>',
+    webapp2.Route(r'/<verification_type:signup|reset>/<user_id:\d+>/<token:.+>',
                   VerificationHandler, name='verification'),
-    webapp2.Route('/password', SetPasswordHandler),
+    webapp2.Route('/reset', ResetPasswordHandler),
     webapp2.Route('/login', LoginHandler, name='login'),
     webapp2.Route('/logout', LogoutHandler),
     webapp2.Route('/forgot', ForgotPasswordHandler),
