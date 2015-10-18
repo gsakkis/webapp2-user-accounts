@@ -8,7 +8,7 @@ from webapp2_extras.appengine.auth.models import Unique, UserToken
 class User(ndb.Expando):
 
     unique_model = Unique
-    unique_properties = ('auth_id', 'email_address')
+    unique_properties = ('auth_id', 'email')
     token_model = UserToken
 
     created = ndb.DateTimeProperty(auto_now_add=True)
