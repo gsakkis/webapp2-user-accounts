@@ -49,8 +49,7 @@ class BaseHandler(webapp2.RequestHandler):
     def render_template(self, view_filename, params=None):
         if not params:
             params = {}
-        user = self.user_info
-        params['user'] = user
+        params['user'] = self.user_info
         path = os.path.join(os.path.dirname(__file__), 'views', view_filename)
         return self.response.out.write(template.render(path, params))
 
@@ -82,20 +81,18 @@ class SignupHandler(BaseHandler):
         return self.render_template('signup.html')
 
     def post(self):
-        user_name = self.request.get('username')
-        email = self.request.get('email')
-        name = self.request.get('name')
-        password = self.request.get('password')
-        last_name = self.request.get('lastname')
-
-        unique_properties = ['email_address']
-        user_data = User.create_user(user_name, unique_properties,
-                                     email_address=email, password_raw=password,
-                                     name=name, last_name=last_name, verified=False)
+        username = self.request.get('username')
+        user_data = User.create_user(username,
+                                     unique_properties=['email_address'],
+                                     email_address=self.request.get('email'),
+                                     password_raw=self.request.get('password'),
+                                     name=self.request.get('name'),
+                                     last_name=self.request.get('lastname'),
+                                     verified=False)
         if not user_data[0]:  # user_data is a tuple
             return self.display_message(
                 'Unable to create user for email %s because of duplicate keys %s'
-                % (user_name, user_data[1]))
+                % (username, user_data[1]))
 
         user_id = user_data[1].get_id()
         token = User.create_auth_token(user_id, 'signup')
@@ -115,7 +112,6 @@ class ForgotPasswordHandler(BaseHandler):
 
     def post(self):
         username = self.request.get('username')
-
         user = User.get_by_auth_id(username)
         if not user:
             logging.info('Could not find any user entry for username %s', username)
@@ -147,10 +143,6 @@ class VerificationHandler(BaseHandler):
         signup_token = kwargs['signup_token']
         verification_type = kwargs['type']
 
-        # it should be something more concise like
-        # auth.get_auth().get_user_by_token(user_id, signup_token)
-        # unfortunately the auth interface does not (yet) allow to manipulate
-        # signup tokens concisely
         user, ts = User.get_by_auth_token(int(user_id), signup_token, 'signup')
         if not user:
             logging.info('Could not find any user with id "%s" signup token "%s"',
