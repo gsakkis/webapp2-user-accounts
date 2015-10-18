@@ -4,7 +4,8 @@ import logging
 import os.path
 import webapp2
 
-from webapp2_extras import auth, sessions
+from webapp2_extras import sessions
+from webapp2_extras.auth import get_auth
 from google.appengine.ext.webapp import template
 
 from models import User
@@ -45,7 +46,7 @@ class BaseHandler(webapp2.RequestHandler):
         :returns
           A dictionary with most user information
         """
-        return auth.get_auth().get_user_by_session()
+        return get_auth().get_user_by_session()
 
     def create_verification_url(self, user):
         user_id = user.get_id()
@@ -84,6 +85,7 @@ class MainHandler(BaseHandler):
 class SignupHandler(BaseHandler):
 
     def get(self):
+        get_auth().unset_session()
         return self.render_template('signup.html')
 
     def post(self):
@@ -142,10 +144,10 @@ class VerificationHandler(BaseHandler):
         User.delete_auth_token(user.get_id(), token, self.TOKEN_SUBJECT)
 
         # store user data in the session
-        auth_obj = auth.get_auth()
+        auth = get_auth()
         # invalidate current session (if any) and set a new one
-        auth_obj.unset_session()
-        auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
+        auth.unset_session()
+        auth.set_session(auth.store.user_to_dict(user), remember=True)
 
         if not user.verified:
             user.verified = True
@@ -158,7 +160,7 @@ class VerificationHandler(BaseHandler):
 class LogoutHandler(BaseHandler):
 
     def get(self):
-        auth.get_auth().unset_session()
+        get_auth().unset_session()
         return self.redirect(self.uri_for('home'))
 
 
