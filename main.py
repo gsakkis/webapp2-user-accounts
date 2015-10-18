@@ -2,8 +2,9 @@
 
 import logging
 import os.path
-import webapp2
+import time
 
+import webapp2
 from webapp2_extras import sessions
 from webapp2_extras.auth import get_auth
 from google.appengine.ext.webapp import template
@@ -132,21 +133,27 @@ class LoginHandler(BaseHandler):
 class VerificationHandler(BaseHandler):
 
     TOKEN_SUBJECT = 'temp'
+    TOKEN_MAX_AGE = 3600  # one hour
 
     def get(self, user_id, token):
-        user, ts = User.get_by_auth_token(int(user_id), token, self.TOKEN_SUBJECT)
+        user_id = int(user_id)
+        # get user by temp token
+        user, ts = User.get_by_auth_token(user_id, token, self.TOKEN_SUBJECT)
+        # remove temp token, we don't want users to come back with an old link
+        User.delete_auth_token(user_id, token, self.TOKEN_SUBJECT)
+
         if not user:
-            logging.info('Could not find any user with id "%s" token "%s"',
-                         user_id, token)
+            logging.info('Could not find any user with id %r token %r', user_id, token)
             self.abort(404, 'This link has expired')
 
-        # remove token, we don't want users to come back with an old link
-        User.delete_auth_token(user.get_id(), token, self.TOKEN_SUBJECT)
+        if int(time.time()) - ts > self.TOKEN_MAX_AGE:
+            logging.info('Token %r for user with id %r has expired', user_id, token)
+            self.abort(404, 'This link has expired')
 
-        # store user data in the session
         auth = get_auth()
-        # invalidate current session (if any) and set a new one
+        # invalidate current session (if any)
         auth.unset_session()
+        # create a new token with new timestamp and store user data in the session
         auth.set_session(auth.store.user_to_dict(user), remember=True)
 
         if not user.verified:
