@@ -96,8 +96,8 @@ class SignupHandler(BaseHandler):
 
         user_id = user_data[1].get_id()
         token = User.create_auth_token(user_id, 'signup')
-        verification_url = self.uri_for('verification', type='v', user_id=user_id,
-                                        signup_token=token, _full=True)
+        verification_url = self.uri_for('verification', verification_type='v',
+                                        user_id=user_id, token=token, _full=True)
 
         msg = 'Send an email to user in order to verify their address. \
           They will be able to do so by visiting <a href="{url}">{url}</a>'
@@ -119,8 +119,8 @@ class ForgotPasswordHandler(BaseHandler):
 
         user_id = user.get_id()
         token = User.create_auth_token(user_id, 'signup')
-        verification_url = self.uri_for('verification', type='p', user_id=user_id,
-                                        signup_token=token, _full=True)
+        verification_url = self.uri_for('verification', verification_type='p',
+                                        user_id=user_id, token=token, _full=True)
 
         msg = 'Send an email to user in order to reset their password. \
           They will be able to do so by visiting <a href="{url}">{url}</a>'
@@ -138,15 +138,11 @@ class ForgotPasswordHandler(BaseHandler):
 
 class VerificationHandler(BaseHandler):
 
-    def get(self, **kwargs):
-        user_id = kwargs['user_id']
-        signup_token = kwargs['signup_token']
-        verification_type = kwargs['type']
-
-        user, ts = User.get_by_auth_token(int(user_id), signup_token, 'signup')
+    def get(self, verification_type, user_id, token):
+        user, ts = User.get_by_auth_token(int(user_id), token, 'signup')
         if not user:
-            logging.info('Could not find any user with id "%s" signup token "%s"',
-                         user_id, signup_token)
+            logging.info('Could not find any user with id "%s" token "%s"',
+                         user_id, token)
             self.abort(404)
 
         # store user data in the session
@@ -154,8 +150,8 @@ class VerificationHandler(BaseHandler):
         auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
         if verification_type == 'v':
-            # remove signup token, we don't want users to come back with an old link
-            User.delete_auth_token(user.get_id(), signup_token, 'signup')
+            # remove token, we don't want users to come back with an old link
+            User.delete_auth_token(user.get_id(), token, 'signup')
             if not user.verified:
                 user.verified = True
                 user.put()
@@ -165,7 +161,7 @@ class VerificationHandler(BaseHandler):
             # supply user to the page
             params = {
                 'user': user,
-                'token': signup_token
+                'token': token
             }
             return self.render_template('resetpassword.html', params)
         else:
@@ -187,7 +183,7 @@ class SetPasswordHandler(BaseHandler):
         user.password = security.generate_password_hash(password, length=12)
         user.put()
 
-        # remove signup token, we don't want users to come back with an old link
+        # remove token, we don't want users to come back with an old link
         User.delete_auth_token(user.get_id(), old_token, 'signup')
 
         return self.display_message('Password updated')
@@ -235,7 +231,7 @@ class AuthenticatedHandler(BaseHandler):
 app = webapp2.WSGIApplication([
     webapp2.Route('/', MainHandler, name='home'),
     webapp2.Route('/signup', SignupHandler),
-    webapp2.Route(r'/<type:v|p>/<user_id:\d+>-<signup_token:.+>',
+    webapp2.Route(r'/<verification_type:v|p>/<user_id:\d+>/<token:.+>',
                   VerificationHandler, name='verification'),
     webapp2.Route('/password', SetPasswordHandler),
     webapp2.Route('/login', LoginHandler, name='login'),
