@@ -5,17 +5,17 @@ from webapp2_extras import auth, security
 from webapp2_extras.appengine.auth.models import Unique, UserToken
 
 
-class User(ndb.model.Expando):
+class User(ndb.Expando):
 
     unique_model = Unique
     unique_properties = ('auth_id', 'email_address')
     token_model = UserToken
 
-    created = ndb.model.DateTimeProperty(auto_now_add=True)
-    updated = ndb.model.DateTimeProperty(auto_now=True)
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    updated = ndb.DateTimeProperty(auto_now=True)
     # ID for third party authentication, e.g. 'google:username'. UNIQUE.
-    auth_ids = ndb.model.StringProperty(repeated=True)
-    password = ndb.model.StringProperty()
+    auth_ids = ndb.StringProperty(repeated=True)
+    password = ndb.StringProperty()
 
     def get_id(self):
         return self._key.id()
