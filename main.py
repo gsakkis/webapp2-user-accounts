@@ -164,7 +164,7 @@ class VerificationHandler(BaseHandler):
                 user.put()
             return self.display_message('User email address has been verified.')
         elif verification_type == 'reset':
-            return self.render_template('resetpassword.html', {'user': user})
+            return self.render_template('resetpassword.html')
 
         assert False, verification_type
 
