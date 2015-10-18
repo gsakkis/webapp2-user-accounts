@@ -1,7 +1,6 @@
 import time
 
 from google.appengine.ext import ndb
-from webapp2_extras import auth, security
 from webapp2_extras.appengine.auth.models import Unique, UserToken
 
 
@@ -14,23 +13,9 @@ class User(ndb.Expando):
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
     email = ndb.StringProperty(required=True)
-    password = ndb.StringProperty()
 
     def get_id(self):
         return self._key.id()
-
-    @classmethod
-    def get_by_auth_id(cls, auth_id):
-        return cls.query(cls.email == auth_id).get()
-
-    @classmethod
-    def get_by_auth_password(cls, auth_id, password):
-        user = cls.get_by_auth_id(auth_id)
-        if not user:
-            raise auth.InvalidAuthIdError()
-        if not security.check_password_hash(password, user.password):
-            raise auth.InvalidPasswordError()
-        return user
 
     @classmethod
     def get_by_auth_token(cls, user_id, token, subject='auth'):
@@ -53,13 +38,6 @@ class User(ndb.Expando):
 
     @classmethod
     def create_user(cls, **user_values):
-        assert user_values.get('password') is None, \
-            'Use password_raw instead of password to create new users.'
-
-        if 'password_raw' in user_values:
-            user_values['password'] = security.generate_password_hash(
-                user_values.pop('password_raw'), length=12)
-
         user = cls(**user_values)
 
         # Set up unique properties

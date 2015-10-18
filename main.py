@@ -4,10 +4,11 @@ import logging
 import os.path
 import webapp2
 
-from webapp2_extras import auth, security, sessions
+from webapp2_extras import auth, sessions
 from google.appengine.ext.webapp import template
 
 from models import User
+
 
 config = {
     'webapp2_extras.auth': {
@@ -83,7 +84,6 @@ class SignupHandler(BaseHandler):
     def post(self):
         email = self.request.get('email')
         user_data = User.create_user(email=email,
-                                     password_raw=self.request.get('password'),
                                      name=self.request.get('name'),
                                      last_name=self.request.get('lastname'),
                                      verified=False)
@@ -105,14 +105,14 @@ class SignupHandler(BaseHandler):
         return self.display_message(msg.format(url=verification_url))
 
 
-class ForgotPasswordHandler(BaseHandler):
+class LoginHandler(BaseHandler):
 
     def get(self):
         return self._serve_page(self.request.get('email'), not_found=False)
 
     def post(self):
         email = self.request.get('email')
-        user = User.get_by_auth_id(email)
+        user = User.query(User.email == email).get()
         if not user:
             logging.info('Could not find any user entry for email %s', email)
             return self._serve_page(email, not_found=True)
@@ -124,14 +124,14 @@ class ForgotPasswordHandler(BaseHandler):
                                         verification_type=verification_type,
                                         user_id=user_id, token=token, _full=True)
 
-        msg = 'Send an email to user in order to reset their password. \
+        msg = 'Send an email to user to allow them to login. \
           They will be able to do so by visiting <a href="{url}">{url}</a>'
 
         return self.display_message(msg.format(url=verification_url))
 
     def _serve_page(self, email, not_found):
-        return self.render_template('forgot.html', {'email': email,
-                                                    'not_found': not_found})
+        return self.render_template('login.html', {'email': email,
+                                                   'not_found': not_found})
 
 
 class VerificationHandler(BaseHandler):
@@ -158,45 +158,9 @@ class VerificationHandler(BaseHandler):
                 user.put()
             return self.display_message('User email address has been verified.')
         elif verification_type == 'reset':
-            return self.render_template('resetpassword.html')
+            return self.redirect(self.uri_for('home'))
 
         assert False, verification_type
-
-
-class ResetPasswordHandler(BaseHandler):
-
-    @user_required
-    def post(self):
-        password = self.request.get('password')
-        if not password or password != self.request.get('confirm_password'):
-            return self.display_message('passwords do not match')
-
-        user = User.get_by_id(self.user_info['user_id'])
-        user.password = security.generate_password_hash(password, length=12)
-        user.put()
-
-        return self.display_message('Password updated')
-
-
-class LoginHandler(BaseHandler):
-
-    def get(self):
-        return self._serve_page(self.request.get('email'), failed=False)
-
-    def post(self):
-        email = self.request.get('email')
-        password = self.request.get('password')
-        try:
-            auth.get_auth().get_user_by_password(email, password,
-                                                 remember=True, save_session=True)
-            return self.redirect(self.uri_for('home'))
-        except auth.AuthError as e:
-            logging.info('Login failed for %s: %s', email, e)
-            return self._serve_page(email, failed=True)
-
-    def _serve_page(self, email, failed):
-        return self.render_template('login.html', {'email': email,
-                                                   'failed': failed})
 
 
 class LogoutHandler(BaseHandler):
@@ -218,10 +182,8 @@ app = webapp2.WSGIApplication([
     webapp2.Route('/signup', SignupHandler),
     webapp2.Route(r'/<verification_type:signup|reset>/<user_id:\d+>/<token:.+>',
                   VerificationHandler, name='verification'),
-    webapp2.Route('/reset', ResetPasswordHandler),
     webapp2.Route('/login', LoginHandler, name='login'),
     webapp2.Route('/logout', LogoutHandler),
-    webapp2.Route('/forgot', ForgotPasswordHandler),
     webapp2.Route('/authenticated', AuthenticatedHandler)
 ], debug=True, config=config)
 

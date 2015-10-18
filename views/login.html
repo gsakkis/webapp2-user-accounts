@@ -4,19 +4,15 @@
 
 <h1>Login</h1>
 
-{% if failed %}
-<strong>Login failed!</strong> Check your credentials and try again.
+<p>Click the link below to receive an email to allow you to log in.</p>
+
+{% if not_found %}
+<strong>Not found!</strong> We could not found any user with the given email.
 {% endif %}
 
 <form class="form" action= "/login" method="POST">
-	<label for="email">Email</label>
 	<input type="text" value="{{ email }}" name="email"/>
-	<label for="password">Password</label>
-	<input type="password" name="password"/>
-	<button type="submit" class="btn">Login</button>
+	<input type="submit" value="Send login link"/>
 </form>
-
-<a href="/forgot">Forgot password</a>
-
 
 {% endblock %}
