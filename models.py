@@ -8,13 +8,12 @@ from webapp2_extras.appengine.auth.models import Unique, UserToken
 class User(ndb.Expando):
 
     unique_model = Unique
-    unique_properties = ('auth_id', 'email')
+    unique_properties = ('email',)
     token_model = UserToken
 
     created = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
-    # ID for third party authentication, e.g. 'google:username'. UNIQUE.
-    auth_ids = ndb.StringProperty(repeated=True)
+    email = ndb.StringProperty(required=True)
     password = ndb.StringProperty()
 
     def get_id(self):
@@ -22,7 +21,7 @@ class User(ndb.Expando):
 
     @classmethod
     def get_by_auth_id(cls, auth_id):
-        return cls.query(cls.auth_ids == auth_id).get()
+        return cls.query(cls.email == auth_id).get()
 
     @classmethod
     def get_by_auth_password(cls, auth_id, password):
@@ -53,24 +52,18 @@ class User(ndb.Expando):
         cls.token_model.get_key(user_id, subject, token).delete()
 
     @classmethod
-    def create_user(cls, auth_id, **user_values):
+    def create_user(cls, **user_values):
         assert user_values.get('password') is None, \
             'Use password_raw instead of password to create new users.'
-
-        assert not isinstance(auth_id, list), \
-            'Creating a user with multiple auth_ids is not allowed, ' \
-            'please provide a single auth_id.'
 
         if 'password_raw' in user_values:
             user_values['password'] = security.generate_password_hash(
                 user_values.pop('password_raw'), length=12)
 
-        user_values['auth_ids'] = [auth_id]
         user = cls(**user_values)
 
         # Set up unique properties
         uniques = []
-        user_values['auth_id'] = auth_id
         for name in cls.unique_properties:
             key = '%s.%s:%s' % (cls.__name__, name, user_values[name])
             uniques.append((key, name))

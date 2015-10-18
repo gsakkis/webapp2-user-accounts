@@ -81,9 +81,8 @@ class SignupHandler(BaseHandler):
         return self.render_template('signup.html')
 
     def post(self):
-        username = self.request.get('username')
-        user_data = User.create_user(username,
-                                     email=self.request.get('email'),
+        email = self.request.get('email')
+        user_data = User.create_user(email=email,
                                      password_raw=self.request.get('password'),
                                      name=self.request.get('name'),
                                      last_name=self.request.get('lastname'),
@@ -91,7 +90,7 @@ class SignupHandler(BaseHandler):
         if not user_data[0]:  # user_data is a tuple
             return self.display_message(
                 'Unable to create user for email %s because of duplicate keys %s'
-                % (username, user_data[1]))
+                % (email, user_data[1]))
 
         user_id = user_data[1].get_id()
         verification_type = 'signup'
@@ -109,14 +108,14 @@ class SignupHandler(BaseHandler):
 class ForgotPasswordHandler(BaseHandler):
 
     def get(self):
-        return self._serve_page()
+        return self._serve_page(self.request.get('email'), not_found=False)
 
     def post(self):
-        username = self.request.get('username')
-        user = User.get_by_auth_id(username)
+        email = self.request.get('email')
+        user = User.get_by_auth_id(email)
         if not user:
-            logging.info('Could not find any user entry for username %s', username)
-            return self._serve_page(not_found=True)
+            logging.info('Could not find any user entry for email %s', email)
+            return self._serve_page(email, not_found=True)
 
         user_id = user.get_id()
         verification_type = 'reset'
@@ -130,13 +129,9 @@ class ForgotPasswordHandler(BaseHandler):
 
         return self.display_message(msg.format(url=verification_url))
 
-    def _serve_page(self, not_found=False):
-        username = self.request.get('username')
-        params = {
-            'username': username,
-            'not_found': not_found
-        }
-        return self.render_template('forgot.html', params)
+    def _serve_page(self, email, not_found):
+        return self.render_template('forgot.html', {'email': email,
+                                                    'not_found': not_found})
 
 
 class VerificationHandler(BaseHandler):
@@ -186,26 +181,22 @@ class ResetPasswordHandler(BaseHandler):
 class LoginHandler(BaseHandler):
 
     def get(self):
-        return self._serve_page()
+        return self._serve_page(self.request.get('email'), failed=False)
 
     def post(self):
-        username = self.request.get('username')
+        email = self.request.get('email')
         password = self.request.get('password')
         try:
-            auth.get_auth().get_user_by_password(username, password,
+            auth.get_auth().get_user_by_password(email, password,
                                                  remember=True, save_session=True)
             return self.redirect(self.uri_for('home'))
         except auth.AuthError as e:
-            logging.info('Login failed for user %s because of %s', username, type(e))
-            return self._serve_page(True)
+            logging.info('Login failed for %s: %s', email, e)
+            return self._serve_page(email, failed=True)
 
-    def _serve_page(self, failed=False):
-        username = self.request.get('username')
-        params = {
-            'username': username,
-            'failed': failed
-        }
-        return self.render_template('login.html', params)
+    def _serve_page(self, email, failed):
+        return self.render_template('login.html', {'email': email,
+                                                   'failed': failed})
 
 
 class LogoutHandler(BaseHandler):
