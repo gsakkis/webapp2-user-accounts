@@ -83,7 +83,6 @@ class SignupHandler(BaseHandler):
     def post(self):
         username = self.request.get('username')
         user_data = User.create_user(username,
-                                     unique_properties=['email_address'],
                                      email_address=self.request.get('email'),
                                      password_raw=self.request.get('password'),
                                      name=self.request.get('name'),

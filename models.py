@@ -7,9 +7,8 @@ from webapp2_extras.appengine.auth.models import Unique, UserToken
 
 class User(ndb.model.Expando):
 
-    #: The model used to ensure uniqueness.
     unique_model = Unique
-    #: The model used to store tokens.
+    unique_properties = ('auth_id', 'email_address')
     token_model = UserToken
 
     created = ndb.model.DateTimeProperty(auto_now_add=True)
@@ -54,7 +53,7 @@ class User(ndb.model.Expando):
         cls.token_model.get_key(user_id, subject, token).delete()
 
     @classmethod
-    def create_user(cls, auth_id, unique_properties=None, **user_values):
+    def create_user(cls, auth_id, **user_values):
         assert user_values.get('password') is None, \
             'Use password_raw instead of password to create new users.'
 
@@ -69,12 +68,12 @@ class User(ndb.model.Expando):
         user_values['auth_ids'] = [auth_id]
         user = cls(**user_values)
 
-        # Set up unique properties.
-        uniques = [('%s.auth_id:%s' % (cls.__name__, auth_id), 'auth_id')]
-        if unique_properties:
-            for name in unique_properties:
-                key = '%s.%s:%s' % (cls.__name__, name, user_values[name])
-                uniques.append((key, name))
+        # Set up unique properties
+        uniques = []
+        user_values['auth_id'] = auth_id
+        for name in cls.unique_properties:
+            key = '%s.%s:%s' % (cls.__name__, name, user_values[name])
+            uniques.append((key, name))
 
         ok, existing = cls.unique_model.create_multi(k for k, v in uniques)
         if ok:
