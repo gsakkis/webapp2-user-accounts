@@ -147,7 +147,10 @@ class VerificationHandler(BaseHandler):
         if not user:
             logging.info('Could not find any user with id "%s" token "%s"',
                          user_id, token)
-            self.abort(404)
+            self.abort(404, 'This link has expired')
+
+        # remove token, we don't want users to come back with an old link
+        User.delete_auth_token(user.get_id(), token, verification_type)
 
         # store user data in the session
         auth_obj = auth.get_auth()
@@ -156,19 +159,14 @@ class VerificationHandler(BaseHandler):
         auth_obj.set_session(auth_obj.store.user_to_dict(user), remember=True)
 
         if verification_type == 'signup':
-            # remove token, we don't want users to come back with an old link
-            User.delete_auth_token(user.get_id(), token, verification_type)
             if not user.verified:
                 user.verified = True
                 user.put()
-
             return self.display_message('User email address has been verified.')
         elif verification_type == 'reset':
-            return self.render_template('resetpassword.html',
-                                        {'user': user, 'token': token})
-        else:
-            logging.info('verification type not supported')
-            self.abort(404)
+            return self.render_template('resetpassword.html', {'user': user})
+
+        assert False, verification_type
 
 
 class ResetPasswordHandler(BaseHandler):
@@ -176,17 +174,12 @@ class ResetPasswordHandler(BaseHandler):
     @user_required
     def post(self):
         password = self.request.get('password')
-        old_token = self.request.get('t')
-
         if not password or password != self.request.get('confirm_password'):
             return self.display_message('passwords do not match')
 
         user = User.get_by_id(self.user_info['user_id'])
         user.password = security.generate_password_hash(password, length=12)
         user.put()
-
-        # remove token, we don't want users to come back with an old link
-        User.delete_auth_token(user.get_id(), old_token, 'reset')
 
         return self.display_message('Password updated')
 
